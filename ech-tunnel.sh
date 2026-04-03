@@ -1,24 +1,20 @@
 #!/bin/bash
 
 # =========================================================
-# ECH Tunnel 一键管理脚本 (支持自定义并发版)
-# 功能：分级菜单、自动列表、批量管理、智能补全、多路复用调节
+# ECH Tunnel 一键管理脚本 (支持自定义并发+一键卸载版)
 # =========================================================
 
-# --- 全局变量 ---
 GITHUB_BIN_URL="https://github.com/kele68108/sap-ech-tunnel/raw/refs/heads/main/ech-tunnel-linux-amd64"
 BIN_PATH="/usr/local/bin/ech-tunnel"
 CONF_BASE_DIR="/etc/ech-tunnel"
 SHORTCUT_CMD="/usr/bin/ech"
 
-# 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 SKYBLUE='\033[0;36m'
 PLAIN='\033[0m'
 
-# --- 基础工具函数 ---
 check_root() {
     if [ "$EUID" -ne 0 ]; then
         echo -e "${RED}错误: 请使用 root 用户运行此脚本！${PLAIN}"
@@ -67,7 +63,6 @@ EOF
     fi
 }
 
-# --- 实例配置加载 ---
 load_instance_config() {
     local name=$1
     INSTANCE_NAME="$name"
@@ -78,7 +73,7 @@ load_instance_config() {
     CFG_SERVER=""
     CFG_LISTEN="proxy://0.0.0.0:30003"
     CFG_TOKEN=""
-    CFG_MUX="4" # 新增：默认并发连接数为 4
+    CFG_MUX="4"
 
     if [ -f "$CONF_FILE" ]; then
         source "$CONF_FILE"
@@ -95,11 +90,9 @@ CFG_MUX="${CFG_MUX:-4}"
 EOF
 }
 
-# --- 服务管理函数 ---
 create_service() {
     echo -e "${YELLOW}正在配置 Systemd 服务...${PLAIN}"
     
-    # 删除了原先写死的 -n 4，改为读取变量
     CMD_ARGS="-l ${CFG_LISTEN} -f ${CFG_SERVER} -ip ${CFG_IP} -n ${CFG_MUX:-4}"
     if [ ! -z "$CFG_TOKEN" ]; then
         CMD_ARGS="${CMD_ARGS} -token ${CFG_TOKEN}"
@@ -175,7 +168,7 @@ stop_service() {
 uninstall_service() {
     echo -e "${RED}警告：将删除实例 [${INSTANCE_NAME}] 的所有配置和服务。${PLAIN}"
     read -p "确认？[y/n]: " choice
-    if [[ "$choice" == "y" ]]; then
+    if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
         systemctl stop "${SERVICE_NAME}" 2>/dev/null
         systemctl disable "${SERVICE_NAME}" 2>/dev/null
         rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
@@ -189,7 +182,6 @@ uninstall_service() {
     fi
 }
 
-# --- 三级页面：实例配置菜单 ---
 instance_menu() {
     while true; do
         load_instance_config "$INSTANCE_NAME"
@@ -269,7 +261,6 @@ instance_menu() {
     done
 }
 
-# --- 二级页面：查看/管理实例 ---
 list_instances() {
     while true; do
         clear
@@ -322,7 +313,6 @@ list_instances() {
     done
 }
 
-# --- 批量操作菜单 (修复无效输入) ---
 batch_operation() {
     clear
     echo -e "${SKYBLUE}====================================${PLAIN}"
@@ -334,17 +324,14 @@ batch_operation() {
     echo ""
     read -p "请选择: " batch_choice
 
-    # 1. 优先处理返回
     if [ "$batch_choice" == "0" ]; then return; fi
 
-    # 2. 严格校验输入 (修复：回车或非法字符提示错误)
     if [[ "$batch_choice" != "1" && "$batch_choice" != "2" ]]; then
         echo -e "${RED}无效序号${PLAIN}"
         sleep 1
         return
     fi
     
-    # 3. 检查是否有实例
     files=(${CONF_BASE_DIR}/*.conf)
     if [ ! -e "${files[0]}" ]; then
         echo -e "${YELLOW}没有实例可操作。${PLAIN}"
@@ -352,7 +339,6 @@ batch_operation() {
         return
     fi
 
-    # 4. 执行操作
     for conf in "${files[@]}"; do
         filename=$(basename -- "$conf")
         name="${filename%.*}"
@@ -370,7 +356,40 @@ batch_operation() {
     read -p "按回车继续..."
 }
 
-# --- 一级主菜单 ---
+# --- 一键完全卸载函数 ---
+uninstall_all() {
+    clear
+    echo -e "${RED}====================================${PLAIN}"
+    echo -e "${RED}     警告：完全卸载 ECH Tunnel${PLAIN}"
+    echo -e "${RED}====================================${PLAIN}"
+    echo -e "此操作将清除："
+    echo -e " 1. 所有实例及其配置文件"
+    echo -e " 2. 所有系统后台服务"
+    echo -e " 3. 核心二进制文件和快捷命令"
+    echo -e " 4. ${YELLOW}本脚本文件也会被自毁删除${PLAIN}"
+    echo ""
+    read -p "确定要彻底卸载吗？[y/n]: " choice
+    if [[ "$choice" == "y" || "$choice" == "Y" ]]; then
+        echo -e "${YELLOW}正在停止并删除所有后台服务...${PLAIN}"
+        systemctl stop ech-tunnel-* 2>/dev/null
+        systemctl disable ech-tunnel-* 2>/dev/null
+        rm -f /etc/systemd/system/ech-tunnel-*.service
+        systemctl daemon-reload
+
+        echo -e "${YELLOW}正在清理核心文件和配置目录...${PLAIN}"
+        rm -f "$BIN_PATH"
+        rm -rf "$CONF_BASE_DIR"
+        rm -f "$SHORTCUT_CMD"
+
+        echo -e "${GREEN}卸载彻底完成！江湖再见！${PLAIN}"
+        rm -f "$0" # 脚本自毁
+        exit 0
+    else
+        echo -e "已取消卸载。"
+        sleep 1
+    fi
+}
+
 main_menu() {
     while true; do
         clear
@@ -380,10 +399,11 @@ main_menu() {
         echo -e " 1. 查看 / 管理实例"
         echo -e " 2. 新建实例"
         echo -e " 3. 停止 / 启动所有实例"
+        echo -e " 4. ${RED}一键完全卸载${PLAIN}"
         echo -e " ------------------------"
         echo -e " 0. 退出脚本"
         echo ""
-        read -p "请选择 [0-3]: " main_choice
+        read -p "请选择 [0-4]: " main_choice
         
         case "$main_choice" in
             1) list_instances ;;
@@ -397,13 +417,13 @@ main_menu() {
                 fi
                 ;;
             3) batch_operation ;;
+            4) uninstall_all ;;
             0) exit 0 ;;
             *) echo "无效输入"; sleep 1 ;;
         esac
     done
 }
 
-# --- 入口 ---
 check_root
 install_dependencies
 download_bin 
