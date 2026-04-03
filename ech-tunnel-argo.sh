@@ -6,7 +6,7 @@
 # =========================================================
 
 # --- 全局变量 ---
-GITHUB_BIN_URL="https://github.com/kele68108/sap-ech-tunnel/raw/refs/heads/main/ech-tunnel-linux-amd64"
+GITHUB_BIN_URL="https://github.com/kele68108/sap-ech-tunnel/raw/refs/heads/main/ech-tunnel-linux-amd64-argo"
 BIN_PATH="/usr/local/bin/ech-tunnel-argo"
 CONF_BASE_DIR="/etc/ech-tunnel-argo"
 SHORTCUT_CMD="/usr/bin/ech2"
