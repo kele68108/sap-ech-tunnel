@@ -6,7 +6,7 @@
 # =========================================================
 
 # --- 全局隔离变量 ---
-GITHUB_BIN_URL="https://github.com/kele35818/nodejs/raw/refs/heads/main/ech-tunnel-v2-linux-amd64"
+GITHUB_BIN_URL="https://github.com/kele68108/sap-ech-tunnel/raw/refs/heads/main/ech-tunnel-v2-linux-amd64"
 BIN_PATH="/usr/local/bin/ech-tunnel-v2"
 CONF_BASE_DIR="/etc/ech-tunnel-v2"
 SHORTCUT_CMD="/usr/bin/ech2"
